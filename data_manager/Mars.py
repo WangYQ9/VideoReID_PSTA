@@ -46,7 +46,6 @@ class Mars(object):
         # prepare meta data
         train_names = self._get_names(self.train_name_path)
         test_names = self._get_names(self.test_name_path)
-        # self.attributes = pd.read_csv(osp.join(self.root, "mars_attr.csv"), encoding="gbk")
         track_train = loadmat(self.track_train_info_path)['track_train_info'] # numpy.ndarray (8298, 4)
         track_test = loadmat(self.track_test_info_path)['track_test_info'] # numpy.ndarray (12180, 4)
         query_IDX = loadmat(self.query_IDX_path)['query_IDX'].squeeze() # numpy.ndarray (1980,)

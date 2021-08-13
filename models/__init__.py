@@ -1,17 +1,11 @@
 from __future__ import absolute_import
 
-from models.app_refine import app_refine
-from models.basic_just_resnet import ResNet50
-from models.app_tem import app_tem
-from models.temporal_dense import tem_dense
-from models.STAM import STAM
+from models.baseline import ResNet50
+from models.PSTA import PSTA
 
 __factory = {
-    'app_refine' : app_refine,
     'ResNet50' : ResNet50,
-    'app_tem': app_tem,
-    'tem_dense' : tem_dense,
-    'STAM' : STAM,
+    'PSTA' : PSTA,
 }
 
 def get_names():

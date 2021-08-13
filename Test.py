@@ -18,7 +18,6 @@ import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
 from tqdm import tqdm
-from model_analysis import MA
 
 from lr_schedulers import WarmupMultiStepLR
 import transforms as T
@@ -34,36 +33,15 @@ torch.cuda.empty_cache()
 parser = argparse.ArgumentParser(description="ReID Baseline Testing")
 parser.add_argument("--config_file", default="./configs/softmax_triplet.yml", help="path to config file", type=str)
 parser.add_argument("opts", help="Modify config options using the command-line", default=None,nargs=argparse.REMAINDER)
-parser.add_argument('--arch', type=str, default='STAM', choices=['ResNet50', 'tem_dense', 'STAM'])
-parser.add_argument('--model_spatial_pool', type=str, default='avg', choices=['max','avg'], help='how to aggerate spatial feature map')
-parser.add_argument('--model_temporal_pool', type=str, default='avg', choices=['max','avg'], help='how to aggerate temporal feaure vector')
-parser.add_argument('--train_sampler', type=str, default='Random_interval', help='train sampler', choices=['random','Random_interval','Random_choice', 'Begin_interval'])
+parser.add_argument('--arch', type=str, default='STAM', choices=['ResNet50', 'tem_dense', 'PSTA'])
+parser.add_argument('--train_sampler', type=str, default='Random_interval', help='train sampler', choices=['Random_interval', 'Begin_interval'])
 parser.add_argument('--test_sampler', type=str, default='Begin_interval', help='test sampler', choices=['dense', 'Begin_interval'])
-parser.add_argument('--sampler',type=str,default='RandomIdentitySampler', choices=['RandomIdentitySampler', 'RandomIdentitySamplerStrongBasaline', 'RandomIdentitySamplerV2'])
 parser.add_argument('--transform_method', type=str, default='consecutive',choices=['consecutive', 'interval'], help='transform method is tracklet level or frame level')
-parser.add_argument('--sampler_method', type=str, default='random', choices=['random', 'fix'])
 parser.add_argument('--triplet_distance', type=str, default='cosine', choices=['cosine','euclidean'])
 parser.add_argument('--test_distance', type=str, default='cosine', choices=['cosine','euclidean'])
-parser.add_argument('--is_cat', type=str, default='yes', choices=['yes','no'], help='gallery set = gallery set + query set')
-parser.add_argument('--feature_method', type=str, default='cat', choices=['cat', 'final'])
-parser.add_argument('--is_mutual_channel_attention', type=str, default='no', choices=['yes','no'])
-parser.add_argument('--is_mutual_spatial_attention', type=str, default='yes', choices=['yes','no'])
-parser.add_argument('--is_appearance_channel_attention', type=str, default='no', choices=['yes','no'])
-parser.add_argument('--is_appearance_spatial_attention', type=str, default='yes', choices=['yes','no'])
-parser.add_argument('--layer_num', type=int, default=3, choices=[1, 2, 3])
-parser.add_argument('--seq_len', type=int, default=8, choices=[4, 8])
 parser.add_argument('--split_id', type=int, default=0)
-parser.add_argument('--is_down_channel', type=str, default='yes', choices=['yes', 'no'])
 parser.add_argument('--dataset', type=str, default='mars', choices=['mars','prid','duke','ilidsvid'])
-
 parser.add_argument('--test_path', type=str, default=None)
-parser.add_argument('--print_heat', type=str, default='no', choices=['yes', 'no'])
-parser.add_argument('--print_performance', type=bool, default=False)
-parser.add_argument('--print_rank', type=str, default='no', choices=['yes', 'no'])
-parser.add_argument('--print_gram', type=bool, default=False)
-parser.add_argument('--layer_name', type=str, default='layer3', choices=['layer1','layer2', 'layer3', 'down_channel'])
-parser.add_argument('--TSNE', type=bool, default=False)
-parser.add_argument('--device_id', type=str, default='1')
 
 args_ = parser.parse_args()
 
@@ -125,27 +103,7 @@ def main():
     ])
 
     pin_memory = True if use_gpu else False
-
-    if args_.sampler == 'RandomIdentitySampler':
-        video_sampler = RandomIdentitySampler(dataset.train, num_instances=cfg.DATALOADER.NUM_INSTANCE)
-    elif args_.sampler == 'RandomIdentitySamplerStrongBasaline':
-        video_sampler = RandomIdentitySamplerStrongBasaline(dataset.train, num_instances=cfg.DATALOADER.NUM_INSTANCE)
-    elif args_.sampler == 'RandomIdentitySampler':
-        video_sampler = RandomIdentitySampler(dataset.train, num_instances=cfg.DATALOADER.NUM_INSTANCE)
-
-    trainloader = DataLoader(
-        VideoDataset(dataset.train, seq_len=args_.seq_len, sample=args_.train_sampler, transform=transform_test,
-                     dataset_name=cfg.DATASETS.NAME, transform_method=args_.transform_method,
-                     sampler_method=args_.sampler_method),
-        sampler=video_sampler, shuffle=False,
-        batch_size=1, num_workers=cfg.DATALOADER.NUM_WORKERS,
-        pin_memory=pin_memory, drop_last=True
-    )
-
-    if args_.print_gram:
-        batchsize = 1
-    else:
-        batchsize = cfg.TEST.SEQS_PER_BATCH
+    batchsize = cfg.TEST.SEQS_PER_BATCH
 
     if args_.test_sampler == 'dense':
         print('Build dense sampler')
@@ -185,33 +143,12 @@ def main():
     start_time = time.time()
 
     print("Loading checkpoint from '{}'".format(args_.test_path))
-    model_analysis = MA(cfg.OUTPUT_DIR)
-
     print("load model... ")
     checkpoint = torch.load(args_.test_path)
     model.load_state_dict(checkpoint)
 
     print("Evaluate...")
-    if args_.print_performance :
-        q_g_dist = test(model, queryloader, galleryloader, cfg.TEST.TEMPORAL_POOL_METHOD, use_gpu, cfg.DATASETS.NAME)
-
-    if args_.print_heat == 'yes':
-        print("print heat map!")
-        if args_.anaysis_query == 'yes':
-            model_analysis.heat_map(queryloader, model, 'query', args_.dataset)
-        elif args_.anaysis_gallery == 'yes':
-            model_analysis.heat_map(galleryloader, model, 'gallery')
-
-    if args_.print_rank == 'yes':
-        print("Build rank images!")
-        model_analysis.visualize_ranked_results(q_g_dist, dataset, data_type="video")
-
-    if args_.print_gram :
-        print("Build gram picture!")
-        model_analysis.Gram(model=model.module, loader = trainloader, layer_name = args_.layer_name)
-
-    if args_.TSNE :
-        pass
+    test(model, queryloader, galleryloader, cfg.TEST.TEMPORAL_POOL_METHOD, use_gpu, cfg.DATASETS.NAME)
 
     elapsed = round(time.time() - start_time)
     elapsed = str(datetime.timedelta(seconds=elapsed))

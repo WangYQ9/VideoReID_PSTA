@@ -11,52 +11,35 @@ import random
 from torch.utils.data import DataLoader
 
 import data_manager
-from samplers import RandomIdentitySampler, RandomIdentitySamplerStrongBasaline, RandomIdentitySamplerV2
+from samplers import RandomIdentitySampler
 from video_loader import VideoDataset
 
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
 from tqdm import tqdm
-from torchstat import stat
-
 
 from lr_schedulers import WarmupMultiStepLR
 import transforms as T
 import models
-from losses import CrossEntropyLabelSmooth, TripletLoss, CosineTripletLoss
-from utils import AverageMeter, Logger, EMA, make_optimizer, DeepSupervision
+from losses import CrossEntropyLabelSmooth, TripletLoss
+from utils import AverageMeter, Logger, make_optimizer, DeepSupervision
 from eval_metrics import evaluate_reranking
 from config import cfg
-from torch.optim import lr_scheduler
-from model_complexity import compute_model_complexity
 
 torch.cuda.empty_cache()
 
 parser = argparse.ArgumentParser(description="ReID Baseline Training")
 parser.add_argument("--config_file", default="./configs/softmax_triplet.yml", help="path to config file", type=str)
 parser.add_argument("opts", help="Modify config options using the command-line", default=None,nargs=argparse.REMAINDER)
-parser.add_argument('--arch', type=str, default='STAM', choices=['ResNet50', 'tem_dense', 'STAM'])
+parser.add_argument('--arch', type=str, default='PSTA', choices=['ResNet50', 'PSTA'])
 parser.add_argument('--model_spatial_pool', type=str, default='avg', choices=['max','avg'], help='how to aggerate spatial feature map')
 parser.add_argument('--model_temporal_pool', type=str, default='avg', choices=['max','avg'], help='how to aggerate temporal feaure vector')
-parser.add_argument('--train_sampler', type=str, default='Random_interval', help='train sampler', choices=['random','Random_interval','Random_choice'])
+parser.add_argument('--train_sampler', type=str, default='Random_interval', help='train sampler', choices=['Random_interval','Random_choice'])
 parser.add_argument('--test_sampler', type=str, default='Begin_interval', help='test sampler', choices=['dense', 'Begin_interval'])
-parser.add_argument('--sampler',type=str,default='RandomIdentitySampler', choices=['RandomIdentitySampler', 'RandomIdentitySamplerStrongBasaline', 'RandomIdentitySamplerV2'])
-parser.add_argument('--transform_method', type=str, default='consecutive',choices=['consecutive', 'interval'], help='transform method is tracklet level or frame level')
-parser.add_argument('--sampler_method', type=str, default='random', choices=['random', 'fix'])
 parser.add_argument('--triplet_distance', type=str, default='cosine', choices=['cosine','euclidean'])
 parser.add_argument('--test_distance', type=str, default='cosine', choices=['cosine','euclidean'])
-parser.add_argument('--is_cat', type=str, default='yes', choices=['yes','no'], help='gallery set = gallery set + query set')
-parser.add_argument('--feature_method', type=str, default='cat', choices=['cat', 'final'])
-parser.add_argument('--is_mutual_channel_attention', type=str, default='no', choices=['yes','no'])
-parser.add_argument('--is_mutual_spatial_attention', type=str, default='yes', choices=['yes','no'])
-parser.add_argument('--is_appearance_channel_attention', type=str, default='no', choices=['yes','no'])
-parser.add_argument('--is_appearance_spatial_attention', type=str, default='yes', choices=['yes','no'])
-parser.add_argument('--layer_num', type=int, default=3, choices=[1, 2, 3])
-parser.add_argument('--seq_len', type=int, default=8, choices=[4, 8])
 parser.add_argument('--split_id', type=int, default=0)
-parser.add_argument('--LabelSmooth', type=str, default='yes', choices=['yes','no'])
-parser.add_argument('--is_down_channel', type=str, default='yes', choices=['yes', 'no'])
 parser.add_argument('--dataset', type=str, default='mars', choices=['mars','prid','duke','ilidsvid'])
 
 
@@ -103,16 +86,8 @@ def main():
     print("Initializing model: {}".format(cfg.MODEL.NAME))
 
     model = models.init_model(name=args_.arch, num_classes=dataset.num_train_pids, pretrain_choice=cfg.MODEL.PRETRAIN_CHOICE,
-                              model_name=cfg.MODEL.NAME, seq_len = args_.seq_len,
-                              layer_num=args_.layer_num,
-                              is_mutual_channel_attention=args_.is_mutual_channel_attention,
-                              is_mutual_spatial_attention=args_.is_mutual_spatial_attention,
-                              is_appearance_channel_attention=args_.is_appearance_channel_attention,
-                              is_appearance_spatial_attention=args_.is_appearance_spatial_attention,
-                              is_down_channel = args_.is_down_channel,
-                              )
+                              model_name=cfg.MODEL.NAME, seq_len = args_.seq_len)
 
-    num_params, flops = compute_model_complexity(model, (1, args_.seq_len, 3, 256, 128), verbose=True)
     print("Model size: {:.5f}M".format(sum(p.numel() for p in model.parameters()) / 1000000.0))
 
     transform_train = T.Compose([
@@ -129,17 +104,11 @@ def main():
     ])
 
     pin_memory = True if use_gpu else False
-
-    if args_.sampler == 'RandomIdentitySampler':
-        video_sampler = RandomIdentitySampler(dataset.train, num_instances=cfg.DATALOADER.NUM_INSTANCE)
-    elif args_.sampler == 'RandomIdentitySamplerStrongBasaline':
-        video_sampler = RandomIdentitySamplerStrongBasaline(dataset.train, num_instances=cfg.DATALOADER.NUM_INSTANCE)
-    elif args_.sampler == 'RandomIdentitySampler':
-        video_sampler = RandomIdentitySampler(dataset.train, num_instances=cfg.DATALOADER.NUM_INSTANCE)
+    video_sampler = RandomIdentitySampler(dataset.train, num_instances=cfg.DATALOADER.NUM_INSTANCE)
 
     trainloader = DataLoader(
         VideoDataset(dataset.train, seq_len=args_.seq_len, sample=args_.train_sampler, transform=transform_train,
-                     dataset_name=cfg.DATASETS.NAME, transform_method=args_.transform_method, sampler_method=args_.sampler_method),
+                     dataset_name=args_.dataset, transform_method=args_.transform_method, sampler_method=args_.sampler_method),
         sampler=video_sampler,
         batch_size=cfg.SOLVER.SEQS_PER_BATCH, num_workers=cfg.DATALOADER.NUM_WORKERS,
         pin_memory=pin_memory, drop_last=True
@@ -181,12 +150,7 @@ def main():
     model.cuda()
 
     start_time = time.time()
-    if args_.LabelSmooth == 'yes':
-        print(args_.LabelSmooth)
-        print('Build LabelSmooth!')
-        xent = CrossEntropyLabelSmooth(num_classes=dataset.num_train_pids)
-    else:
-        xent = nn.CrossEntropyLoss()
+    xent = CrossEntropyLabelSmooth(num_classes=dataset.num_train_pids)
 
     tent = TripletLoss(cfg.SOLVER.MARGIN, distance=args_.triplet_distance)
 
@@ -206,7 +170,7 @@ def main():
 
         if cfg.SOLVER.EVAL_PERIOD > 0 and ((epoch + 1) % cfg.SOLVER.EVAL_PERIOD == 0 or (epoch + 1) == cfg.SOLVER.MAX_EPOCHS) or epoch == 0:
             print("==> Test")
-            _, metrics = test(model, queryloader, galleryloader, cfg.TEST.TEMPORAL_POOL_METHOD, use_gpu,cfg.DATASETS.NAME)
+            _, metrics = test(model, queryloader, galleryloader, use_gpu)
             rank1 = metrics[0]
             if epoch>220:
                 state_dict = model.state_dict()
@@ -256,7 +220,7 @@ def train(model, trainloader, xent, tent, optimizer, use_gpu):
     return losses.avg
 
 
-def test(model, queryloader, galleryloader, pool, use_gpu, dataset, ranks=[1,5,10,20]):
+def test(model, queryloader, galleryloader, use_gpu, ranks=[1,5,10,20]):
 
     with torch.no_grad():
         model.eval()
@@ -269,7 +233,6 @@ def test(model, queryloader, galleryloader, pool, use_gpu, dataset, ranks=[1,5,1
                 imgs = imgs.cuda()
                 pids = pids.cuda()
                 camids = camids.cuda()
-
 
             if len(imgs.size()) == 6:
                 method = 'dense'
@@ -324,7 +287,6 @@ def test(model, queryloader, galleryloader, pool, use_gpu, dataset, ranks=[1,5,1
             if method == 'dense':
                 features = torch.mean(features, 0, keepdim=True)
 
-
             g_pids.extend(pids.data.cpu())
             g_camids.extend(camids.data.cpu())
             gf.append(features)
@@ -333,7 +295,7 @@ def test(model, queryloader, galleryloader, pool, use_gpu, dataset, ranks=[1,5,1
         g_pids = np.asarray(g_pids)
         g_camids = np.asarray(g_camids)
 
-        if args_.is_cat == 'yes':
+        if args_.dataset == 'mars':
             # gallery set must contain query set, otherwise 140 query imgs will not have ground truth.
             gf = torch.cat((qf, gf), 0)
             g_pids = np.append(q_pids, g_pids)

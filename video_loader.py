@@ -69,30 +69,22 @@ def pil_loader(path):
         with Image.open(f) as img:
             return img.convert('RGB')
 
-def produce_out(imgs_path,seq_len, stride, sample_method='random'):
+def produce_out(imgs_path,seq_len, stride):
     img_len = len(imgs_path)
     frame_indices = list(range(img_len))
     rand_end = max(0, img_len - seq_len * stride  -1)
     begin_index = random.randint(0, rand_end)
     end_index = min(begin_index + seq_len * stride, img_len)
     indices = frame_indices[begin_index:end_index]
+    re_indices= []
+    for i in range(0, seq_len * stride, stride):
+        add_arg = random.randint(0, stride-1)
+        re_indices.append(indices[i + add_arg])
+    re_indices = np.array(re_indices)
 
-    if sample_method == 'random':
-
-        re_indices= []
-        for i in range(0, seq_len * stride, stride):
-            add_arg = random.randint(0, stride-1)
-            re_indices.append(indices[i + add_arg])
-        re_indices = np.array(re_indices)
-
-        out = []
-        for index in re_indices:
-            out.append(imgs_path[int(index)])
-
-    elif sample_method == 'fix':
-
-        out = imgs_path[begin_index:end_index:stride]
-
+    out = []
+    for index in re_indices:
+        out.append(imgs_path[int(index)])
     return out
 
 class VideoDataset(Dataset):
@@ -123,58 +115,17 @@ class VideoDataset(Dataset):
     def __getitem__(self, index):
         img_paths, pid, camid = self.dataset[index]
         num = len(img_paths)
-        if self.sample == 'random':
-            """
-            Randomly sample seq_len consecutive frames from num frames,
-            if num is smaller than seq_len, then replicate items.
-            This sampling strategy is used in training phase.
-            """
-            frame_indices = list(range(num))
-            rand_end = max(0, len(frame_indices) - 2 * self.seq_len - 1)
-            begin_index = random.randint(0, rand_end)
-            end_index = min(begin_index + 2 * self.seq_len, len(frame_indices))
 
-            indices = frame_indices[begin_index:end_index]
-
-            for index in indices:
-                if len(indices) >= 2 * self.seq_len:
-                    break
-                indices.append(index)
-
-            re_indices = []
-            for i in range(0, len(indices), 2):
-                add_arg = random.randint(0,1)
-                re_indices.append(indices[i+add_arg])
-            re_indices = np.array(re_indices)
-
-            cache_img_path = []
-            for index in re_indices:
-                index=int(index)
-                img_path = img_paths[index]
-                cache_img_path.append(img_path)
-
-            imgs = self.loader(cache_img_path)
-            if self.transform_method == 'consecutive':
-                imgs = self.transform(imgs)
-            elif self.transform_method == 'interval':
-                imgs = [self.transform(img) for img in imgs]
-            imgs = torch.stack(imgs,0)
-
-            return imgs, pid, camid
-
-        elif self.sample == 'dense':
+        if self.sample == 'dense':
             """
             Sample all frames in a video into a list of clips, each clip contains seq_len frames, batch_size needs to be set to 1.
             This sampling strategy is used in test phase.
             """
-            # cur_index=0
             frame_indices = list(range(num))
             interval = num // self.seq_len
             indices_list=[]
+
             if num > self.seq_len:
-                # while num-cur_index > self.seq_len:
-                #     indices_list.append(frame_indices[cur_index:cur_index+self.seq_len])
-                #     cur_index+=self.seq_len
                 for index in range(interval):
                     indices_list.append(frame_indices[index : index+interval * self.seq_len : interval])
             else:
@@ -249,19 +200,19 @@ class VideoDataset(Dataset):
 
             if len(img_paths) >= self.seq_len * stride :
                 new_stride = stride
-                out = produce_out(img_paths, self.seq_len, new_stride, self.sampler_method)
+                out = produce_out(img_paths, self.seq_len, new_stride)
 
             elif len(img_paths) >= self.seq_len * int(stride/2):
                 new_stride = int(stride/2)
-                out = produce_out(img_paths, self.seq_len, new_stride, self.sampler_method)
+                out = produce_out(img_paths, self.seq_len, new_stride)
 
             elif len(img_paths) >= self.seq_len * int(stride/4):
                 new_stride = int(stride/4)
-                out = produce_out(img_paths, self.seq_len, new_stride, self.sampler_method)
+                out = produce_out(img_paths, self.seq_len, new_stride)
 
             elif len(img_paths) >= self.seq_len * int(stride/8):
                 new_stride = int(stride/8)
-                out = produce_out(img_paths, self.seq_len, new_stride, self.sampler_method)
+                out = produce_out(img_paths, self.seq_len, new_stride)
 
             else:
                 index = np.random.choice(len(img_paths), size=self.seq_len,replace=True)
@@ -269,34 +220,10 @@ class VideoDataset(Dataset):
                 out = [img_paths[index[i]] for i in range(self.seq_len)]
 
             clip = self.loader(out)
-            if self.transform_method == 'consecutive':
-                clip = self.transform(clip)
-            else:
-                clip = [self.transform(img) for img in clip]
+            clip = self.transform(clip)
             clip = torch.stack(clip, 0)
 
             return clip, pid, camid, out
-
-        elif self.sample == 'Random_choice':
-            img_paths = list(img_paths)
-
-            if len(img_paths) >= self.seq_len:
-                index = np.random.choice(len(img_paths), size=self.seq_len, replace=False)
-                index.sort()
-                out = [img_paths[index[i]] for i in range(self.seq_len)]
-            else:
-                index = np.random.choice(len(img_paths), size=self.seq_len, replace=True)
-                index.sort()
-                out = [img_paths[index[i]] for i in range(self.seq_len)]
-
-            clip = self.loader(out)
-            if self.transform_method == 'consecutive':
-                clip = self.transform(clip)
-            else:
-                clip = [self.transform(img) for img in clip]
-            clip = torch.stack(clip, 0)
-
-            return clip, pid, camid
 
         else:
             raise KeyError("Unknown sample method: {}. Expected one of {}".format(self.sample, self.sample_methods))

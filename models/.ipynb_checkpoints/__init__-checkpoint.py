@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
 from models.app_refine import app_refine
-from models.basic_just_resnet import ResNet50
+from models.baseline import ResNet50
 from models.app_tem import app_tem
 from models.temporal_dense import tem_dense
 

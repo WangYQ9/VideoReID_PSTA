@@ -1,12 +1,8 @@
 from .Mars import *
 from .Duke import *
-from .PRID import *
-from .iLIDSVID import *
 
 __factory = {
     'mars': Mars,
-    'ilidsvid': iLIDSVID,
-    'prid': PRID,
     'duke':DukeMTMCVidReID
 }
 

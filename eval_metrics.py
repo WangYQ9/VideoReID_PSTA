@@ -1,9 +1,6 @@
 from __future__ import print_function, absolute_import
 import numpy as np
-import copy
 import torch
-
-from re_ranking import re_ranking
 
 
 def evaluate(distmat, q_pids, g_pids, q_camids, g_camids, max_rank=50):
@@ -91,20 +88,6 @@ def evaluate_reranking(qf, q_pids, q_camids, gf, g_pids, g_camids, ranks, cal_me
     print("------------------")
     print()
 
-    #
-    # q_q_dist = q_q_dist.cpu().numpy()
-    # g_g_dist = g_g_dist.cpu().numpy()
-    # rerank_dis = re_ranking(q_g_dist, q_q_dist, g_g_dist)
-    #
-    # print("Computing rerank CMC and mAP")
-    # rerank_cmc, rerank_mAP = evaluate(rerank_dis, q_pids, g_pids, q_camids, g_camids)
-    #
-    # print("rerank Results ----------")
-    # print("mAP: {:.1%}".format(rerank_mAP))
-    # print("CMC curve")
-    # for r in ranks:
-    #     print("rerank Rank-{:<3}: {:.1%}".format(r, rerank_cmc[r - 1]))
-    # print("------------------")
     return be_cmc, q_g_dist
 
 if __name__ == "__main__":

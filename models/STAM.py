@@ -1,31 +1,7 @@
 import torch
-from  torch import nn
-import  torch.utils.model_zoo as model_zoo
-from torch.nn import functional as F
-
-from models.backbone.resnet import *
-from models.AATM import *
-
-model_urls = {
-    'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
-    'resnet34': 'https://download.pytorch.org/models/resnet34-333f7ec4.pth',
-    'resnet50': 'https://download.pytorch.org/models/resnet50-19c8e357.pth',
-    'resnet101': 'https://download.pytorch.org/models/resnet101-5d3b4d8f.pth',
-    'resnet152': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth',
-    'resnext50_32x4d': 'https://download.pytorch.org/models/resnext50_32x4d-7cdf4587.pth',
-    'resnext101_32x8d': 'https://download.pytorch.org/models/resnext101_32x8d-8ba56ff5.pth',
-}
-
-def init_pretrained_weight(model, model_url):
-    """Initializes model with pretrained weight
-
-    Layers that don't match with pretrained layers in name or size are kept unchanged
-    """
-    pretrain_dict = model_zoo.load_url(model_url, model_dir='./')
-    model_dict = model.state_dict()
-    pretrain_dict = {k: v for k, v in pretrain_dict.items() if k in model_dict and model_dict[k].size() == v.size()}
-    model_dict.update(pretrain_dict)
-    model.load_state_dict(model_dict)
+import torch.nn as nn
+from models.SRA import SRAG
+from models.TRA import TRAG
 
 def weights_init_kaiming(m):
     classname = m.__class__.__name__
@@ -41,164 +17,66 @@ def weights_init_kaiming(m):
             nn.init.constant_(m.weight, 1.0)
             nn.init.constant_(m.bias, 0.0)
 
-def weight_init_classifier(m):
-    classname = m.__class__.__name__
-    if classname.find('Linear') != -1:
-        nn.init.normal_(m.weight, std=0.001)
-        if m.bias is not None:
-            nn.init.constant_(m.bias, 0.0)
-
 class STAM(nn.Module):
 
-    def __init__(self, num_classes, model_name, pretrain_choice, seq_len, layer_num=3, feature_method='cat',
-                 is_mutual_channel_attention='yes',
-                 is_mutual_spatial_attention='yes',
-                 is_appearance_channel_attention='yes',
-                 is_appearance_spatial_attention='yes',
-                 is_down_channel = 'yes'):
+    def __init__(self, inplanes, mid_planes, num,
+                 is_mutual_channel_attention='yes', is_mutual_spatial_attention='yes',
+                 is_appearance_channel_attention='yes', is_appearance_spatial_attention='yes', **kwargs):
+
         super(STAM, self).__init__()
 
-        self.in_planes = 2048
-        self.base = ResNet()
-
-        if pretrain_choice == 'imagenet':
-            init_pretrained_weight(self.base, model_urls[model_name])
-            print('Loading pretrained ImageNet model ......')
-
-        self.seq_len = seq_len
-        self.num_classes = num_classes
-        self.plances = 1024
-        self.mid_channel = 256
-        self.layer_num = layer_num
-        self.feature_method = feature_method
-        self.is_down_channel = is_down_channel
-
-        self.avg_2d = nn.AdaptiveAvgPool2d((1, 1))
-        self.avg_3d = nn.AdaptiveAvgPool3d((1, 1, 1))
-        self.relu = nn.ReLU(inplace=True)
         self.sigmoid = nn.Sigmoid()
+        self.avg = nn.AdaptiveAvgPool2d((1, 1))
+        self.relu = nn.ReLU(inplace=True)
+        self.num = num
 
-        if self.is_down_channel == 'yes' :
-            print('Build down channel!')
-            self.down_channel = nn.Sequential(
-                nn.Conv2d(in_channels=self.in_planes, out_channels=self.plances, kernel_size=1, stride=1, padding=0, bias=False),
-                nn.BatchNorm2d(self.plances),
-                self.relu
-            )
-        else:
-            self.plances = 2048
+        self.Embeding = nn.Sequential(
+            nn.Conv2d(in_channels=inplanes, out_channels=mid_planes,
+                      kernel_size=1, stride=1, padding=0, bias=False),
+            nn.BatchNorm2d(mid_planes),
+            self.relu,
+            nn.Conv2d(in_channels=mid_planes, out_channels=128,
+                      kernel_size=1, stride=1, padding=0, bias=False),
+            nn.BatchNorm2d(128),
+            self.relu
+        )
+        self.Embeding.apply(weights_init_kaiming)
 
-        if self.layer_num == 3:
-            t = seq_len
-            self.layer1 = AATM(inplanes=self.plances, mid_planes=self.mid_channel, seq_len=t / 2,
-                               is_mutual_channel_attention=is_mutual_channel_attention,
-                               is_mutual_spatial_attention=is_mutual_spatial_attention,
-                               is_appearance_channel_attention=is_appearance_channel_attention,
-                               is_appearance_spatial_attention=is_appearance_spatial_attention,
-                               num= '1')
-            t = t / 2
-            self.layer2 = AATM(inplanes=self.plances, mid_planes=self.mid_channel, seq_len=t / 2,
-                               is_mutual_channel_attention=is_mutual_channel_attention,
-                               is_mutual_spatial_attention=is_mutual_spatial_attention,
-                               is_appearance_channel_attention=is_appearance_channel_attention,
-                               is_appearance_spatial_attention=is_appearance_spatial_attention,
-                               num= '2')
-            t = t / 2
-            self.layer3 = AATM(inplanes=self.plances, mid_planes=self.mid_channel, seq_len=t / 2,
-                               is_mutual_channel_attention=is_mutual_channel_attention,
-                               is_mutual_spatial_attention=is_mutual_spatial_attention,
-                               is_appearance_channel_attention=is_appearance_channel_attention,
-                               is_appearance_spatial_attention=is_appearance_spatial_attention,
-                               num= '3')
+        self.TRAG = TRAG(inplanes=inplanes, is_mutual_channel_attention=is_mutual_channel_attention,
+                        is_mutual_spatial_attention = is_mutual_spatial_attention, num=num)
 
-        elif self.layer_num == 2:
+        self.SRAG = SRAG(inplanes=inplanes, is_appearance_spatial_attention=is_appearance_spatial_attention,
+                         is_appearance_channel_attention=is_appearance_channel_attention, num=num)
 
-            t = seq_len
-            self.layer1 = AATM(inplanes=self.plances, mid_planes=self.mid_channel, seq_len=t / 2,
-                               is_mutual_channel_attention=is_mutual_channel_attention,
-                               is_mutual_spatial_attention=is_mutual_spatial_attention,
-                               is_appearance_channel_attention=is_appearance_channel_attention,
-                               is_appearance_spatial_attention=is_appearance_spatial_attention,
-                               num= '1')
-            t = t / 2
-            self.layer2 = AATM(inplanes=self.plances, mid_planes=self.mid_channel, seq_len=t / 2,
-                               is_mutual_channel_attention=is_mutual_channel_attention,
-                               is_mutual_spatial_attention=is_mutual_spatial_attention,
-                               is_appearance_channel_attention=is_appearance_channel_attention,
-                               is_appearance_spatial_attention=is_appearance_spatial_attention,
-                               num= '2')
+        self.conv_block = nn.Sequential(
+            nn.Conv2d(in_channels=inplanes, out_channels=mid_planes, kernel_size=1, bias=False),
+            nn.BatchNorm2d(mid_planes),
+            self.relu,
+            nn.Conv2d(in_channels=mid_planes, out_channels=mid_planes, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(mid_planes),
+            self.relu,
+            nn.Conv2d(in_channels=mid_planes, out_channels=inplanes, kernel_size=1, bias=False),
+            nn.BatchNorm2d(inplanes),
+            self.relu
+        )
+        self.conv_block.apply(weights_init_kaiming)
 
-        elif self.layer_num == 1:
+    def forward(self, feat_map):
 
-            t = seq_len
-            self.layer1 = AATM(inplanes=self.plances, mid_planes=self.mid_channel, seq_len=t / 2,
-                               is_mutual_channel_attention=is_mutual_channel_attention,
-                               is_mutual_spatial_attention=is_mutual_spatial_attention,
-                               is_appearance_channel_attention=is_appearance_channel_attention,
-                               is_appearance_spatial_attention=is_appearance_spatial_attention,
-                               num= '1')
+        b, t, c, h, w = feat_map.size()
+        reshape_map = feat_map.view(b * t, c, h, w)
+        feat_vect = self.avg(reshape_map).view(b, t, -1)
+        embed_feat = self.Embeding(reshape_map).view(b, t, -1, h, w)
 
-        self.bottleneck = nn.ModuleList([nn.BatchNorm1d(self.plances) for _  in range(3)])
-        self.classifier = nn.ModuleList([nn.Linear(self.plances, num_classes) for _ in range(3)])
-
-        self.bottleneck[0].bias.requires_grad_(False)
-        self.bottleneck[1].bias.requires_grad_(False)
-        self.bottleneck[2].bias.requires_grad_(False)
-
-        self.bottleneck.apply(weights_init_kaiming)
-        self.classifier.apply(weight_init_classifier)
-
-    def forward(self, x, pids=None, camid=None, return_logits = False):
-        b, t, c, w, h = x.size()
-        x = x.view(b * t, c, w, h)
-        feat_map = self.base(x)  # (b * t, c, 16, 8)
-        w = feat_map.size(2)
-        h = feat_map.size(3)
-
-        if self.is_down_channel == 'yes':
-            feat_map = self.down_channel(feat_map)
-
-        feat_map = feat_map.view(b, t, -1, w, h)
-        feature_list = []
-        list = []
-
-        feat_map_1 = self.layer1(feat_map)
-        feature_1 = torch.mean(feat_map_1, 1)
-        feature1 = self.avg_2d(feature_1).view(b, -1)
-        feature_list.append(feature1)
-        list.append(feature1)
-
-        feat_map_2 = self.layer2(feat_map_1)
-        feature_2 = torch.mean(feat_map_2, 1)
-        feature_2 = self.avg_2d(feature_2).view(b, -1)
-        list.append(feature_2)
-
-        feature2 = torch.stack(list, 1)
-        feature2 = torch.mean(feature2, 1)
-        feature_list.append(feature2)
-
-        feat_map_3 = self.layer3(feat_map_2)
-        feature_3 = torch.mean(feat_map_3, 1)
-        feature_3 = self.avg_2d(feature_3).view(b, -1)
-        list.append(feature_3)
-
-        feature3 = torch.stack(list, 1)
-        feature3 = torch.mean(feature3, 1)
-        feature_list.append(feature3)
-
-        BN_feature_list = []
-        for i in range(len(feature_list)):
-            BN_feature_list.append(self.bottleneck[i](feature_list[i]))
+        gap_feat_map0 = self.TRAG(feat_map, reshape_map, feat_vect, embed_feat)
+        gap_feat_map = self.SRAG(feat_map, reshape_map, embed_feat, feat_vect, gap_feat_map0)
+        gap_feat_map = self.conv_block(gap_feat_map)
+        gap_feat_map = gap_feat_map.view(b, -1, c, h, w)
         torch.cuda.empty_cache()
 
-        cls_score = []
-        for i in range(len(BN_feature_list)):
-            cls_score.append(self.classifier[i](BN_feature_list[i]))
+        return gap_feat_map
 
-        if return_logits:
-            return cls_score[1]
 
-        if self.training:
-            return cls_score, BN_feature_list
-        else:
-            return BN_feature_list[2], pids, camid
+
+
+
