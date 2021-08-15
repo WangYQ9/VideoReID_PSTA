@@ -5,6 +5,7 @@ ___
 This is repository contains the code for the paper:
 
 Pyramid Spatial-Temporal Aggregation for Video-based Person Re-Identification
+
 Yingquan Wang, Pingping Zhang, Shang Gao, Xia Geng, Hu Lu, Dong Wang
 
 ICCV 2021
