@@ -1,6 +1,0 @@
-新建文件夹代码
-```
-import os
-for i in range(num):
-	os.mkdir('experiment #' + str(i))
-```
