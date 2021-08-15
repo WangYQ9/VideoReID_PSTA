@@ -1,6 +1,5 @@
 # Pyramid Spatial-Temporal Aggregation for Video-based Person Re-Identification
 
-___
 
 This is repository contains the code for the paper:
 
@@ -48,8 +47,6 @@ if you use this code for your research, please cite our paper:
 This code was developed and tested with pytorch version 1.3.1.
 
 # Acknowledgments
-
----
 
 This code is based on the implementations of [baseline](https://github.com/yuange250/not_so_strong_baseline_for_video_based_person_reID)
 
