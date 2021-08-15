@@ -21,6 +21,13 @@ bash scripts/Mars_train.sh
 bash scripts/Mars_test.sh
 ```
 
+```
+# For DukeMTMC-VID
+bash scripts/Duke_train.sh
+bash scripts/Duke_test.sh
+```
+
+
 ## Citation 
 
 if you use this code for your research, please cite our paper:
