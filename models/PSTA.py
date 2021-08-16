@@ -50,7 +50,7 @@ def weight_init_classifier(m):
 
 class PSTA(nn.Module):
 
-    def __init__(self, num_classes, model_name, pretrain_choice, seq_len):
+    def __init__(self, num_classes, model_name, pretrain_choice, seq_len=8):
         super(PSTA, self).__init__()
 
         self.in_planes = 2048

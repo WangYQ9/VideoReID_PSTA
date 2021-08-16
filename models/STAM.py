@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from models.SRA import SRAG
-from models.TRA import TRAG
+from models.SRA import SRA
+from models.TRA import TRA
 
 def weights_init_kaiming(m):
     classname = m.__class__.__name__
@@ -19,9 +19,7 @@ def weights_init_kaiming(m):
 
 class STAM(nn.Module):
 
-    def __init__(self, inplanes, mid_planes, num,
-                 is_mutual_channel_attention='yes', is_mutual_spatial_attention='yes',
-                 is_appearance_channel_attention='yes', is_appearance_spatial_attention='yes', **kwargs):
+    def __init__(self, inplanes, mid_planes, num, **kwargs):
 
         super(STAM, self).__init__()
 
@@ -42,11 +40,8 @@ class STAM(nn.Module):
         )
         self.Embeding.apply(weights_init_kaiming)
 
-        self.TRAG = TRAG(inplanes=inplanes, is_mutual_channel_attention=is_mutual_channel_attention,
-                        is_mutual_spatial_attention = is_mutual_spatial_attention, num=num)
-
-        self.SRAG = SRAG(inplanes=inplanes, is_appearance_spatial_attention=is_appearance_spatial_attention,
-                         is_appearance_channel_attention=is_appearance_channel_attention, num=num)
+        self.TRAG = TRA(inplanes=inplanes, num=num)
+        self.SRAG = SRA(inplanes=inplanes, num=num)
 
         self.conv_block = nn.Sequential(
             nn.Conv2d(in_channels=inplanes, out_channels=mid_planes, kernel_size=1, bias=False),

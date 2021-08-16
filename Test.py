@@ -11,7 +11,6 @@ import random
 from torch.utils.data import DataLoader
 
 import data_manager
-from samplers import RandomIdentitySampler, RandomIdentitySamplerStrongBasaline, RandomIdentitySamplerV2
 from video_loader import VideoDataset
 
 import torch
@@ -19,14 +18,11 @@ import torch.nn as nn
 import torch.backends.cudnn as cudnn
 from tqdm import tqdm
 
-from lr_schedulers import WarmupMultiStepLR
 import transforms as T
 import models
-from losses import CrossEntropyLabelSmooth, TripletLoss, CosineTripletLoss
-from utils import AverageMeter, Logger, EMA, make_optimizer, DeepSupervision
+from utils import Logger
 from eval_metrics import evaluate_reranking
 from config import cfg
-from torch.optim import lr_scheduler
 
 torch.cuda.empty_cache()
 
@@ -39,6 +35,7 @@ parser.add_argument('--test_sampler', type=str, default='Begin_interval', help='
 parser.add_argument('--transform_method', type=str, default='consecutive',choices=['consecutive', 'interval'], help='transform method is tracklet level or frame level')
 parser.add_argument('--triplet_distance', type=str, default='cosine', choices=['cosine','euclidean'])
 parser.add_argument('--test_distance', type=str, default='cosine', choices=['cosine','euclidean'])
+parser.add_argument('--seq_len', type=int, default=8)
 parser.add_argument('--split_id', type=int, default=0)
 parser.add_argument('--dataset', type=str, default='mars', choices=['mars','prid','duke','ilidsvid'])
 parser.add_argument('--test_path', type=str, default=None)
@@ -86,12 +83,6 @@ def main():
 
     model = models.init_model(name=args_.arch, num_classes=dataset.num_train_pids, pretrain_choice=cfg.MODEL.PRETRAIN_CHOICE,
                               model_name=cfg.MODEL.NAME, seq_len = args_.seq_len,
-                              layer_num=args_.layer_num,
-                              is_mutual_channel_attention=args_.is_mutual_channel_attention,
-                              is_mutual_spatial_attention=args_.is_mutual_spatial_attention,
-                              is_appearance_channel_attention=args_.is_appearance_channel_attention,
-                              is_appearance_spatial_attention=args_.is_appearance_spatial_attention,
-                              is_down_channel = args_.is_down_channel,
                               )
 
     print("Model size: {:.5f}M".format(sum(p.numel() for p in model.parameters()) / 1000000.0))
@@ -229,7 +220,7 @@ def test(model, queryloader, galleryloader, pool, use_gpu, dataset, ranks=[1, 5,
         g_pids = np.asarray(g_pids)
         g_camids = np.asarray(g_camids)
 
-        if args_.is_cat == 'yes':
+        if args_.dataset == 'mars':
             # gallery set must contain query set, otherwise 140 query imgs will not have ground truth.
             gf = torch.cat((qf, gf), 0)
             g_pids = np.append(q_pids, g_pids)

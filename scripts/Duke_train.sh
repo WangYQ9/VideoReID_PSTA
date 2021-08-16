@@ -8,4 +8,3 @@ python Train.py     --arch 'PSTA'\
                     --test_sampler 'dense'\
                     --triplet_distance 'cosine'\
                     --test_distance 'cosine'\
-                    --seq_len 8 \

@@ -41,6 +41,7 @@ parser.add_argument('--triplet_distance', type=str, default='cosine', choices=['
 parser.add_argument('--test_distance', type=str, default='cosine', choices=['cosine','euclidean'])
 parser.add_argument('--split_id', type=int, default=0)
 parser.add_argument('--dataset', type=str, default='mars', choices=['mars','prid','duke','ilidsvid'])
+parser.add_argument('--seq_len', type=int, default=8)
 
 
 args_ = parser.parse_args()
@@ -108,7 +109,7 @@ def main():
 
     trainloader = DataLoader(
         VideoDataset(dataset.train, seq_len=args_.seq_len, sample=args_.train_sampler, transform=transform_train,
-                     dataset_name=args_.dataset, transform_method=args_.transform_method, sampler_method=args_.sampler_method),
+                     dataset_name=args_.dataset),
         sampler=video_sampler,
         batch_size=cfg.SOLVER.SEQS_PER_BATCH, num_workers=cfg.DATALOADER.NUM_WORKERS,
         pin_memory=pin_memory, drop_last=True

@@ -95,8 +95,7 @@ class VideoDataset(Dataset):
 
     def __init__(self, dataset, seq_len=15, sample='evenly',
                  transform=None, max_seq_len=200, dataset_name="mars",
-                 get_loader = get_default_video_loader, transform_method = None,
-                 sampler_method = None,
+                 get_loader = get_default_video_loader,
                  ):
 
         self.dataset = dataset
@@ -106,8 +105,6 @@ class VideoDataset(Dataset):
         self.max_seq_len = max_seq_len
         self.dataset_name = dataset_name
         self.loader = get_loader()
-        self.transform_method = transform_method
-        self.sampler_method = sampler_method
 
     def __len__(self):
         return len(self.dataset)
