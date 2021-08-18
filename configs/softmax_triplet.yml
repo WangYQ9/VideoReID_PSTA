@@ -3,7 +3,7 @@ MODEL:
   PRETRAIN_PATH: '.resnet50-19c8e357.pth'
   IF_LABELSMOOTH: 'on'
   IF_WITH_CENTER: 'yes'
-  ARCH : 'tem_dense'
+  ARCH : 'PSTA'
 #   LOCAL_RANK : [0,1]
 
 INPUT:
@@ -15,7 +15,7 @@ INPUT:
 
 DATASETS:
   SEQ_LEN: 8
-  NAME : 'ilidsvid'
+  NAME : 'Mars'
   ROOT_DIR : '/home/wyq/dataset/'
   TRAIN_SAMPLE_METHOD : "Random_interval"
   TEST_SAMPLE_METHOD : "Begin_interval"

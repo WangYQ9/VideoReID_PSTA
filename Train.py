@@ -32,15 +32,13 @@ torch.cuda.empty_cache()
 parser = argparse.ArgumentParser(description="ReID Baseline Training")
 parser.add_argument("--config_file", default="./configs/softmax_triplet.yml", help="path to config file", type=str)
 parser.add_argument("opts", help="Modify config options using the command-line", default=None,nargs=argparse.REMAINDER)
-parser.add_argument('--arch', type=str, default='PSTA', choices=['ResNet50', 'PSTA'])
-parser.add_argument('--model_spatial_pool', type=str, default='avg', choices=['max','avg'], help='how to aggerate spatial feature map')
-parser.add_argument('--model_temporal_pool', type=str, default='avg', choices=['max','avg'], help='how to aggerate temporal feaure vector')
+parser.add_argument('--arch', type=str, default='ResNet50', choices=['ResNet50', 'PSTA'])
 parser.add_argument('--train_sampler', type=str, default='Random_interval', help='train sampler', choices=['Random_interval','Random_choice'])
 parser.add_argument('--test_sampler', type=str, default='Begin_interval', help='test sampler', choices=['dense', 'Begin_interval'])
 parser.add_argument('--triplet_distance', type=str, default='cosine', choices=['cosine','euclidean'])
 parser.add_argument('--test_distance', type=str, default='cosine', choices=['cosine','euclidean'])
 parser.add_argument('--split_id', type=int, default=0)
-parser.add_argument('--dataset', type=str, default='mars', choices=['mars','prid','duke','ilidsvid'])
+parser.add_argument('--dataset', type=str, default='mars', choices=['mars','duke'])
 parser.add_argument('--seq_len', type=int, default=8)
 
 
@@ -303,7 +301,6 @@ def test(model, queryloader, galleryloader, use_gpu, ranks=[1,5,10,20]):
             g_camids = np.append(q_camids, g_camids)
 
         np.save("gallery_pathes", gallery_pathes)
-
         print("Extracted features for gallery set, obtained {}-by-{} matrix".format(gf.size(0), gf.size(1)))
         print("Computing distance matrix")
 

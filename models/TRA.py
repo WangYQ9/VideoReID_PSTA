@@ -24,12 +24,8 @@ class TRA(nn.Module):
 
         self.inplanes = inplanes
         self.num = num
-
-
         self.relu = nn.ReLU(True)
-        # self.sigmoid = nn.Sigmoid(True)
         self.avg = nn.AdaptiveAvgPool2d((1, 1))
-
 
         print('Build ' + self.num + ' layer TRA!')
 
@@ -73,9 +69,6 @@ class TRA(nn.Module):
         )
         self.te_para.apply(weights_init_kaiming)
 
-
-        print('Build ' + self.num + ' layer TRA!')
-
         self.theta_channel = nn.Sequential(
             nn.Conv1d(in_channels=inplanes, out_channels=int(inplanes / 8),
                       kernel_size=1, stride=1, padding=0, bias=False),
@@ -94,11 +87,9 @@ class TRA(nn.Module):
     def forward(self, featmap, re_featmap, vect_featmap, embed_feat):
 
         b, t, c, h, w = featmap.size()
-
         gamma_feat = self.gamma_temporal(re_featmap).view(b, t, -1, h * w)
         beta_feat = self.beta_temporal(re_featmap).view(b, t, -1, h * w)
         channel_para = self.theta_channel(vect_featmap.permute(0, 2, 1))
-
         gap_feat_map0 = []
 
         for idx in range(0, t, 2):
@@ -127,7 +118,6 @@ class TRA(nn.Module):
             Gs_joint0 = self.gg_temporal(Gs_joint0)
             para_alpha = self.tte_para(torch.cat((embed_feat0, embed_feat1), 1))
             para_alpha = self.te_para(torch.cat((para_alpha, Gs_joint0), 1))
-
 
             Gs_joint1 = torch.cat((Gs_in1, Gs_out0), 1)
             Gs_joint1 = self.gg_temporal(Gs_joint1)

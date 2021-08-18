@@ -2,7 +2,6 @@
 
 python Test.py  --arch 'PSTA'\
                 --dataset 'mars'\
-                --train_sampler 'Begin_interval'\
                 --test_sampler 'Begin_interval'\
                 --triplet_distance 'cosine'\
                 --test_distance 'cosine'\
