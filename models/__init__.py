@@ -4,7 +4,6 @@ from models.baseline import ResNet50
 from models.PSTA import PSTA
 
 __factory = {
-    'ResNet50' : ResNet50,
     'PSTA' : PSTA,
 }
 
