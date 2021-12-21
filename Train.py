@@ -91,8 +91,8 @@ def main():
 
     transform_train = T.Compose([
         T.resize(cfg.INPUT.SIZE_TRAIN, interpolation=3),
-        T.random_crop((256,128)),
-        T.pad(10),
+ #       T.random_crop((256,128)),
+ #       T.pad(10),
         T.random_horizontal_flip(),
         T.to_tensor(),
         T.normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
