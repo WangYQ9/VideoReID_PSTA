@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 
-from models.baseline import ResNet50
 from models.PSTA import PSTA
 
 __factory = {
