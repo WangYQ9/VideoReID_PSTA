@@ -29,7 +29,7 @@ bash scripts/Duke_test.sh
 |:--:|:--:|:--:|
 |Rank-1|91.5|98.3|
 |mAP|85.8|97.7|
-|model|[baidu:PSTA](https://pan.baidu.com/s/1Cwj6TGzInDdOJ9Kcs7S9Iw),[Google](https://drive.google.com/file/d/1qI9-CjIW3REiumCp05OmlFbI6G2A0jlz/view?usp=sharing)|[baidu:PSTA](https://pan.baidu.com/s/1hR33gjd6R27Nwn0s4fGShQ)[Google](https://drive.google.com/file/d/1R10VGbLgAiSsxedZ9mPtpTqIXzWVC-56/view?usp=sharing)|
+|model|[baidu:PSTA](https://pan.baidu.com/s/1Cwj6TGzInDdOJ9Kcs7S9Iw);[Google](https://drive.google.com/file/d/1qI9-CjIW3REiumCp05OmlFbI6G2A0jlz/view?usp=sharing)|[baidu:PSTA](https://pan.baidu.com/s/1hR33gjd6R27Nwn0s4fGShQ);[Google](https://drive.google.com/file/d/1R10VGbLgAiSsxedZ9mPtpTqIXzWVC-56/view?usp=sharing)|
 
 
 ## Citation 
